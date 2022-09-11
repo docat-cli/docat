@@ -1,9 +1,10 @@
-use crate::config::app::App;
 use crate::config::config::Config;
 use crate::file::{cached_config, cached_config_file, CONFIG_FILENAME};
 use crate::git::ConfigCmd;
 use crate::service::{Service, Status};
-use crate::{cmd, config, cwd, docker, git, ComposeCmd, NetworkCmd, ProjectDirName, VolumeCmd};
+use crate::{
+    cmd, config, cwd, docker, git, ComposeCmd, NetworkCmd, Parameters, ProjectDirName, VolumeCmd,
+};
 use anyhow::Result;
 use dialoguer::Confirm;
 use std::collections::{BTreeMap, HashSet};
@@ -71,12 +72,13 @@ pub fn init(app_name: String) -> Result<()> {
     Ok(())
 }
 
-pub fn install(app: &App, projects: Vec<ProjectDirName>) {
-    app.filter_projects(projects, false)
-        .into_iter()
+pub fn install(parameters: &Parameters) {
+    parameters
+        .projects
+        .iter()
         .filter(|(_, project)| !project.dir.exists() && !project.git.is_empty())
         .for_each(|(_, project)| {
-            git::clone(&project.git, &app.config.shared_dir);
+            git::clone(&project.git, &parameters.app.config.shared_dir);
 
             project.networks.iter().for_each(|network| {
                 docker::network(NetworkCmd::Create(network.clone()));
@@ -94,47 +96,51 @@ pub fn install(app: &App, projects: Vec<ProjectDirName>) {
         });
 }
 
-pub fn run_install(app: &App, projects: Vec<ProjectDirName>) {
-    if projects.is_empty() {
-        panic!("Must provide projects to run install steps on")
+pub fn run_install(parameters: &Parameters) {
+    if parameters.projects.is_empty() {
+        panic!("Cannot run install on all projects")
     }
 
-    app.filter_projects(projects, false)
-        .into_iter()
-        .for_each(|(_, project)| {
-            project.networks.iter().for_each(|network| {
-                docker::network(NetworkCmd::Create(network.clone()));
-            });
-
-            project.volumes.iter().for_each(|volume| {
-                docker::volume(VolumeCmd::Create(volume.clone()));
-            });
-
-            cmd::run_from_list(
-                &project.on_install,
-                &project.dir,
-                "Could not run install command",
-            );
+    parameters.projects.iter().for_each(|(_, project)| {
+        project.networks.iter().for_each(|network| {
+            docker::network(NetworkCmd::Create(network.clone()));
         });
+
+        project.volumes.iter().for_each(|volume| {
+            docker::volume(VolumeCmd::Create(volume.clone()));
+        });
+
+        cmd::run_from_list(
+            &project.on_install,
+            &project.dir,
+            "Could not run install command",
+        );
+    });
 }
 
-pub fn up(app: &App, projects: Vec<ProjectDirName>) {
-    install(app, projects.clone());
+pub fn up(parameters: &Parameters) {
+    install(parameters);
 
-    let down_projects = statuses(app, projects)
-        .into_iter()
+    let down_projects = statuses(parameters)
+        .iter()
         .filter(|(_, services)| {
             services
                 .iter()
                 .any(|service| service.status == Status::Down)
         })
         .collect::<BTreeMap<_, _>>()
-        .into_keys()
+        .keys()
+        .cloned()
+        .cloned()
         .collect::<HashSet<String>>();
 
-    docker::network(NetworkCmd::Create(app.config.shared_network.clone()));
+    docker::network(NetworkCmd::Create(
+        parameters.app.config.shared_network.clone(),
+    ));
 
-    app.projects
+    parameters
+        .app
+        .projects
         .iter()
         .filter(|(dir_name, _)| down_projects.contains(dir_name.clone()))
         .for_each(|(_, project)| {
@@ -155,30 +161,29 @@ pub fn up(app: &App, projects: Vec<ProjectDirName>) {
         });
 }
 
-pub fn down(app: &App, projects: Vec<String>) {
-    let is_empty = projects.is_empty();
-    app.filter_projects(projects, is_empty)
-        .into_iter()
-        .for_each(|(_, project)| {
-            docker::compose(ComposeCmd::Down, &project.dir);
-        });
+pub fn down(parameters: &Parameters) {
+    parameters.projects.iter().for_each(|(_, project)| {
+        docker::compose(ComposeCmd::Down, &project.dir);
+    });
 }
 
-pub fn restart(app: &App, projects: Vec<String>) {
-    down(app, projects.clone());
-    up(app, projects);
+pub fn restart(parameters: &Parameters) {
+    down(parameters);
+    up(parameters);
 }
 
-pub fn status(app: &App, projects: Vec<String>) {
-    statuses(app, projects)
-        .into_iter()
+pub fn status(parameters: &Parameters) {
+    statuses(parameters)
+        .iter()
         .for_each(|(dir_name, services)| {
             println!();
             println!(
                 "{}",
-                app.projects
-                    .get(&dir_name)
-                    .map(|project| project.name.clone().unwrap_or(dir_name.clone()))
+                parameters
+                    .app
+                    .projects
+                    .get(dir_name)
+                    .map(|project| project.name())
                     .unwrap_or(dir_name.clone())
             );
             services.iter().for_each(|service| {
@@ -187,9 +192,10 @@ pub fn status(app: &App, projects: Vec<String>) {
         });
 }
 
-fn statuses(app: &App, projects: Vec<ProjectDirName>) -> BTreeMap<ProjectDirName, Vec<Service>> {
-    app.filter_projects(projects, true)
-        .into_iter()
+fn statuses(parameters: &Parameters) -> BTreeMap<ProjectDirName, Vec<Service>> {
+    parameters
+        .projects
+        .iter()
         .map(|(dir_name, project)| {
             let mut statuses: BTreeMap<String, Service> = String::from_utf8(
                 docker::compose(

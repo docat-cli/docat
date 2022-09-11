@@ -9,7 +9,7 @@ use std::{env, fs};
 pub(crate) mod app;
 mod app_config;
 pub(crate) mod config;
-mod project;
+pub(crate) mod project;
 
 pub fn combine(app: &Option<String>) -> Result<App> {
     // try and load file from current directory

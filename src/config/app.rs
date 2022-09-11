@@ -32,49 +32,6 @@ impl App {
         self.projects.get_mut(name).unwrap()
     }
 
-    pub fn filter_projects(
-        &self,
-        projects: Vec<String>,
-        include_install: bool,
-    ) -> BTreeMap<ProjectDirName, Project> {
-        if projects.is_empty() {
-            return self.projects.clone();
-        }
-
-        let mut cloned_projects = self.projects.clone();
-        let mut projects = projects
-            .into_iter()
-            .filter_map(|dir_or_project_name| {
-                cloned_projects
-                    .remove(&dir_or_project_name)
-                    .or_else(|| {
-                        self.projects
-                            .clone()
-                            .into_iter()
-                            .find(|(_, project)| {
-                                project
-                                    .name
-                                    .clone()
-                                    .unwrap_or_default()
-                                    .eq(&dir_or_project_name)
-                            })
-                            .and_then(|(dir_name, _)| cloned_projects.remove(&*dir_name))
-                    })
-                    .map(|project| (project.dir_name.clone(), project))
-            })
-            .collect::<BTreeMap<_, _>>();
-
-        // if an install project still exists in the projects, add it
-        if include_install {
-            cloned_projects
-                .into_iter()
-                .find(|(_, project)| project.is_install)
-                .map(|(dir_name, project)| projects.insert(dir_name, project));
-        }
-
-        return projects;
-    }
-
     pub fn merge(&self, provided_app: &App) -> Self {
         let mut new_app = self.clone();
 

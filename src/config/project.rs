@@ -53,6 +53,10 @@ impl Project {
         }
     }
 
+    pub fn name(&self) -> String {
+        self.name.clone().unwrap_or(self.dir_name.clone())
+    }
+
     pub fn merge(&self, provided_project: &Project) -> Project {
         let mut new_project = self.clone();
 
