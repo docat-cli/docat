@@ -90,6 +90,8 @@ impl Project {
             new_project.compose_files = project.compose_files;
         }
 
+        new_project.is_install = project.is_install;
+
         new_project
     }
 }
