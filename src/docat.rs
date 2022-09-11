@@ -94,6 +94,30 @@ pub fn install(app: &App, projects: Vec<ProjectDirName>) {
         });
 }
 
+pub fn run_install(app: &App, projects: Vec<ProjectDirName>) {
+    if projects.is_empty() {
+        panic!("Must provide projects to run install steps on")
+    }
+
+    app.filter_projects(projects, false)
+        .into_iter()
+        .for_each(|(_, project)| {
+            project.networks.iter().for_each(|network| {
+                docker::network(NetworkCmd::Create(network.clone()));
+            });
+
+            project.volumes.iter().for_each(|volume| {
+                docker::volume(VolumeCmd::Create(volume.clone()));
+            });
+
+            cmd::run_from_list(
+                &project.on_install,
+                &project.dir,
+                "Could not run install command",
+            );
+        });
+}
+
 pub fn up(app: &App, projects: Vec<ProjectDirName>) {
     install(app, projects.clone());
 

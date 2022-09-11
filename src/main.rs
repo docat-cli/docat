@@ -40,6 +40,11 @@ enum Command {
         /// List of projects to install
         projects: Vec<String>,
     },
+    /// Re-run commands on install
+    RunInstall {
+        /// List of projects to install
+        projects: Vec<String>,
+    },
     /// Bring up projects
     Up {
         /// List of projects to bring up
@@ -74,6 +79,7 @@ fn main() -> Result<()> {
     match args.clone().command {
         Command::Init { app } => docat::init(app)?,
         Command::Install { projects } => docat::install(&get_app(&args)?, projects),
+        Command::RunInstall { projects } => docat::run_install(&get_app(&args)?, projects),
         Command::Up { projects } => docat::up(&get_app(&args)?, projects),
         Command::Down { projects } => docat::down(&get_app(&args)?, projects),
         Command::Restart { projects } => docat::restart(&get_app(&args)?, projects),
