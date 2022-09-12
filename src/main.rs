@@ -30,7 +30,7 @@ pub struct Args {
     app: Option<String>,
 
     /// Run on all projects
-    #[clap(global = true, long, default_missing_value = "true", exclusive = true)]
+    #[clap(global = true, long, default_missing_value = "true")]
     all: Option<bool>,
 }
 
@@ -86,7 +86,7 @@ fn get_app(args: &Args) -> Result<App> {
 fn main() -> Result<()> {
     let mut args = Args::parse();
 
-    fs::create_dir_all(file::cached_config())?;
+    fs::create_dir_all(file::cached_config_path())?;
 
     match args.clone().command {
         Command::Init { app } => docat::init(app)?,

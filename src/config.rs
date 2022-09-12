@@ -1,8 +1,8 @@
+use crate::config::config::Config;
 use crate::file::CONFIG_FILENAME;
 use crate::{cwd, file};
-use anyhow::Result;
+use anyhow::{bail, Result};
 use app::App;
-use config::Config;
 use std::path::PathBuf;
 use std::{env, fs};
 
@@ -14,16 +14,45 @@ pub(crate) mod project;
 pub fn combine(app: &Option<String>) -> Result<App> {
     // try and load file from current directory
     let config = load_from(&cwd()).ok();
-    let user_config_path = file::cached_config();
-    let user_config_file = file::cached_config_file();
-    let mut user_config = load_from(&user_config_path)?;
-    let app_name = &get_app_name(app, &config, &user_config);
-    let app = user_config.get(app_name);
+    let cached_config_path = file::cached_config_path();
+    let cached_config_file = file::cached_config_file();
+    let current_dir_name = cwd().file_name().unwrap().to_str().unwrap().to_string();
+    let mut cached_config = load_from(&cached_config_path).or_else(|err| {
+        let is_install_dir = config
+            .as_ref()
+            .map(|config| {
+                config
+                    .apps
+                    .iter()
+                    .map(|(_, app)| {
+                        app.projects
+                            .iter()
+                            .find(|(_, project)| project.is_install)
+                            .map(|(dir_name, _)| dir_name.clone())
+                    })
+                    .rfold(None, |_, name| name)
+                    .map_or(false, |name| name == current_dir_name)
+            })
+            .unwrap_or(false);
+
+        match is_install_dir {
+            true => {
+                // copy config
+                let mut config_file = cwd();
+                config_file.push(CONFIG_FILENAME);
+                fs::copy(config_file, cached_config_file.clone())?;
+                config.clone().ok_or(err)
+            }
+            false => bail!(err.to_string()),
+        }
+    })?;
+    let app_name = &get_app_name(app, &config, &cached_config);
+    let app = cached_config.get(app_name);
 
     // find install directory
     let install_config = load_from(&app.config.install_dir)?;
 
-    let mut merged_config = user_config.merge(&install_config);
+    let mut merged_config = cached_config.merge(&install_config);
 
     let project_configs = merged_config
         .get(app_name)
@@ -41,7 +70,7 @@ pub fn combine(app: &Option<String>) -> Result<App> {
             base_config.merge(config)
         });
 
-    fs::write(user_config_file, serde_yaml::to_string(&all_configs)?)?;
+    fs::write(cached_config_file, serde_yaml::to_string(&all_configs)?)?;
 
     Ok(all_configs.get(app_name).clone())
 }

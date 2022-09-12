@@ -10,7 +10,7 @@ pub fn cwd() -> PathBuf {
     }
 }
 
-pub fn cached_config() -> PathBuf {
+pub fn cached_config_path() -> PathBuf {
     match home_dir() {
         None => panic!("Could not load home directory"),
         Some(mut file) => {
@@ -21,7 +21,7 @@ pub fn cached_config() -> PathBuf {
 }
 
 pub fn cached_config_file() -> PathBuf {
-    let mut file = cached_config();
+    let mut file = cached_config_path();
     file.push(CONFIG_FILENAME);
     file
 }

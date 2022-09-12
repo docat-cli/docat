@@ -1,6 +1,7 @@
 use crate::config::app_config::AppConfig;
+use crate::config::path_buf_is_new;
 use crate::config::project::Project;
-use crate::ProjectDirName;
+use crate::{cwd, ProjectDirName};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use std::collections::BTreeMap;
@@ -37,6 +38,14 @@ impl App {
 
         new_app.config = new_app.config.merge(&provided_app.config);
 
+        // if we don't have an install directory, construct it based on the cwd
+        if path_buf_is_new(&new_app.config.install_dir) {
+            new_app.config.install_dir = cwd();
+            let mut shared_dir = new_app.config.install_dir.clone();
+            shared_dir.pop();
+            new_app.config.shared_dir = shared_dir;
+        }
+
         let merged_projects = &mut provided_app
             .clone()
             .projects
@@ -48,20 +57,18 @@ impl App {
                         .get(dir_name)
                         .cloned()
                         .map(|original_project| original_project.merge(project))
-                        .map(|mut merged_project| {
+                        .or(Some(project.clone()))
+                        .map(|mut project| {
                             let shared_dir = new_app.config.shared_dir.clone();
                             let mut project_dir = shared_dir.clone();
                             project_dir.push(dir_name);
-                            merged_project.dir_name = dir_name.clone();
-                            merged_project.dir = project_dir.clone();
 
-                            if merged_project.dir.eq(&new_app.config.install_dir) {
-                                merged_project.is_install = true;
-                            }
+                            project.dir_name = dir_name.clone();
+                            project.dir = project_dir.clone();
 
-                            merged_project
+                            project
                         })
-                        .unwrap_or(project.clone()),
+                        .unwrap(),
                 )
             })
             .collect::<BTreeMap<_, _>>();
