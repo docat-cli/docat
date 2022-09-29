@@ -31,6 +31,9 @@ pub struct Project {
     pub on_up: Vec<String>,
 
     #[serde(default = "Vec::new", skip_serializing_if = "Vec::is_empty")]
+    pub after_up: Vec<String>,
+
+    #[serde(default = "Vec::new", skip_serializing_if = "Vec::is_empty")]
     pub compose_files: Vec<String>,
 
     #[serde(default = "bool::default", skip_serializing_if = "bool_is_false")]
@@ -48,6 +51,7 @@ impl Project {
             volumes: Vec::new(),
             on_install: Vec::new(),
             on_up: Vec::new(),
+            after_up: Vec::new(),
             compose_files: Vec::new(),
             is_install: false,
         }
@@ -88,6 +92,10 @@ impl Project {
 
         if !project.on_up.is_empty() {
             new_project.on_up = project.on_up;
+        }
+
+        if !project.after_up.is_empty() {
+            new_project.after_up = project.after_up;
         }
 
         if !project.compose_files.is_empty() {

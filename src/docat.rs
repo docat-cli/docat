@@ -175,6 +175,12 @@ pub fn up(parameters: &Parameters) {
                 ComposeCmd::Up(Vec::new(), project.compose_files.clone()),
                 &project.dir,
             );
+
+            cmd::run_from_list(
+                &project.after_up,
+                &project.dir,
+                "Could not run after up hooks",
+            );
         });
 }
 
