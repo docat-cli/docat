@@ -1,0 +1,5 @@
+#!/bin/bash
+
+cargo build --release
+tar -czf docat-mac-$(uname -m).tar.gz target/release/docat
+shasum -a 256 docat-mac-$(uname -m).tar.gz
