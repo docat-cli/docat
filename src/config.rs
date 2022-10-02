@@ -49,8 +49,14 @@ pub fn combine(app: &Option<String>) -> Result<App> {
     let app_name = &get_app_name(app, &config, &cached_config);
     let app = cached_config.get(app_name);
 
+    // clone current app config
+    let app_config = app.config.clone();
+
     // find install directory
     let install_config = load_from(&app.config.install_dir)?;
+
+    // remove current app and rebuild
+    cached_config.apps.remove(app_name);
 
     let mut merged_config = cached_config.merge(&install_config);
 
@@ -69,6 +75,9 @@ pub fn combine(app: &Option<String>) -> Result<App> {
         .fold(merged_config, |base_config, config| {
             base_config.merge(config)
         });
+
+    // set original app config back
+    all_configs.get(app_name).config = app_config;
 
     fs::write(cached_config_file, serde_yaml::to_string(&all_configs)?)?;
 

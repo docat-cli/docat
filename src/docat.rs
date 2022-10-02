@@ -3,7 +3,8 @@ use crate::file::{cached_config_file, cached_config_path, CONFIG_FILENAME};
 use crate::git::ConfigCmd;
 use crate::service::{Service, Status};
 use crate::{
-    cmd, config, cwd, docker, git, ComposeCmd, NetworkCmd, Parameters, ProjectDirName, VolumeCmd,
+    cmd, config, cwd, docker, git, ComposeCmd, NetworkCmd, Parameters, Project, ProjectDirName,
+    VolumeCmd,
 };
 use anyhow::Result;
 use dialoguer::Confirm;
@@ -20,41 +21,68 @@ pub fn init(app_name: String) -> Result<()> {
         return Ok(());
     }
 
-    let cached_config = &mut config::load_from(&cached_config_path()).or_else(|_| {
-        // create a new cached config if it doesn't already exist
-        let mut cached_config = Config::new();
-        let app = cached_config.add_app(&app_name);
-        app.config.init(&cwd());
-
-        Result::<Config>::Ok(cached_config)
-    })?;
+    let cached_config =
+        &mut config::load_from(&cached_config_path()).or(Result::<Config>::Ok(Config::new()))?;
 
     // generate new project config
     let mut new_config = Config::new();
     let config_filename = cwd();
     let dir_name = config_filename.file_name().unwrap().to_str().unwrap();
-    let app = new_config.add_app(&app_name);
-    let project = app.add_project(dir_name);
+    let new_app = new_config.add_app(&app_name);
 
     // if this is a new init
     if !cached_config.apps.contains_key(&app_name) {
-        let app = cached_config.add_app(&app_name);
-        app.config.init(&cwd());
-        app.config.shared_network = app_name.clone();
+        new_app.config.shared_network = app_name.clone();
+
+        let project = new_app.add_project(dir_name);
         project.is_install = true;
-        let default_repo_string =
-            format!("https://git@github.com:name/{}.git", dir_name.to_string());
-        project.git = git::config(ConfigCmd::Get("remote.origin.url".to_string()), &cwd())
-            .stdout
-            .as_slice()
-            .lines()
-            .filter_map(|x| x.ok())
-            .fold(default_repo_string, |acc: String, line| {
-                match line.is_empty() {
-                    true => acc,
-                    false => line,
-                }
-            });
+
+        // add app config to cached config
+        let cached_app = cached_config.add_app(&app_name);
+        cached_app.config.init(&cwd());
+
+        set_git_config(project, dir_name)
+    } else {
+        // add app to install config if it doesn't exist
+        let cached_app = cached_config.get(&app_name);
+        if !cached_app.projects.contains_key(dir_name) {
+            cached_app
+                .projects
+                .iter()
+                .find(|(_, project)| project.is_install)
+                .and_then(|(_, project)| {
+                    config::load_from(&project.dir)
+                        .ok()
+                        .and_then(|mut install_config| {
+                            install_config
+                                .apps
+                                .get(&app_name)
+                                .and_then(|project_app| {
+                                    project_app
+                                        .projects
+                                        .get(dir_name)
+                                        .cloned()
+                                        .or(Some(project_app.clone().add_project(dir_name).clone()))
+                                })
+                                .map(|mut new_project| {
+                                    let mut install_config_file = project.dir.clone();
+                                    install_config_file.push(CONFIG_FILENAME);
+                                    set_git_config(&mut new_project, dir_name);
+
+                                    install_config
+                                        .get(&app_name)
+                                        .projects
+                                        .insert(dir_name.parse().unwrap(), new_project);
+
+                                    // write project config
+                                    let config_yaml = serde_yaml::to_string(&install_config)
+                                        .expect("Could not create yaml");
+                                    fs::write(install_config_file, config_yaml)
+                                        .expect("Could not write config");
+                                })
+                        })
+                });
+        }
     }
 
     let cached_config = cached_config.merge(&new_config);
@@ -256,4 +284,19 @@ fn statuses(parameters: &Parameters) -> BTreeMap<ProjectDirName, Vec<Service>> {
             (dir_name.clone(), services)
         })
         .collect()
+}
+
+fn set_git_config(project: &mut Project, dir_name: &str) {
+    let default_repo_string = format!("https://git@github.com:name/{}.git", dir_name.to_string());
+    project.git = git::config(ConfigCmd::Get("remote.origin.url".to_string()), &cwd())
+        .stdout
+        .as_slice()
+        .lines()
+        .filter_map(|x| x.ok())
+        .fold(default_repo_string, |acc: String, line| {
+            match line.is_empty() {
+                true => acc,
+                false => line,
+            }
+        });
 }
