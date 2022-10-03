@@ -71,7 +71,17 @@ enum Command {
         /// List of projects to get status for
         projects: Vec<String>,
     },
-    /// Run a command on a container
+    /// Start a new container without dependencies and run command
+    Run {
+        /// Specify which project to execute command on
+        #[clap(global = true, long, short)]
+        project: Option<String>,
+        /// The service to run the command on
+        service: String,
+        /// The command to run on the service
+        command: Vec<String>,
+    },
+    /// Run a command on a running container
     Exec {
         /// Specify which project to execute command on
         #[clap(global = true, long, short)]
@@ -118,6 +128,13 @@ fn main() -> Result<()> {
                 args.all = Some(true);
             }
             docat::status(&get_parameters(&args, &projects, false)?)
+        }
+        Command::Run {
+            service,
+            command,
+            project,
+        } => {
+            docat::run(&service, &command, &get_project(&args, project)?);
         }
         Command::Exec {
             service,

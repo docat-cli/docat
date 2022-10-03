@@ -15,6 +15,7 @@ pub enum ComposeCmd {
     Config(Vec<String>),
     List(Vec<String>),
     Down,
+    Run(String, Vec<String>, Vec<String>),
     Exec(String, Vec<String>, Vec<String>),
 }
 
@@ -64,6 +65,10 @@ pub fn compose(subcommand: ComposeCmd, dir: &PathBuf) -> Output {
             cmd_wrapper.ignore_output = true;
             add_files(cmd, files);
             cmd.args(["ps", "--format", "json"])
+        }
+        ComposeCmd::Run(service, files, command_string) => {
+            add_files(cmd, files);
+            cmd.args(["run", "-T", "--rm", "--no-deps"]).arg(service).args(command_string)
         }
         ComposeCmd::Exec(service, files, command_string) => {
             add_files(cmd, files);

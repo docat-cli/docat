@@ -243,6 +243,17 @@ pub fn status(parameters: &Parameters) {
         });
 }
 
+pub fn run(service: &String, command: &Vec<String>, project: &Project) {
+    docker::compose(
+        ComposeCmd::Run(
+            service.clone(),
+            project.compose_files.clone(),
+            command.clone(),
+        ),
+        &project.dir,
+    );
+}
+
 pub fn exec(service: &String, command: &Vec<String>, project: &Project) {
     docker::compose(
         ComposeCmd::Exec(
