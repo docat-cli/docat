@@ -56,7 +56,6 @@ impl App {
                     self.projects
                         .get(dir_name)
                         .cloned()
-                        .or(Some(Project::new()))
                         .map(|original_project| original_project.merge(project))
                         .or(Some(project.clone()))
                         .map(|mut project| {

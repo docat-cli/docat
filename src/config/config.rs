@@ -42,7 +42,6 @@ impl Config {
                     self.apps
                         .get(key)
                         .cloned()
-                        .or(Some(App::new()))
                         .map(|original_app| original_app.merge(app))
                         .unwrap_or(app.clone()),
                 )

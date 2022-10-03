@@ -106,4 +106,18 @@ impl Project {
 
         new_project
     }
+
+    pub fn reset(&self) -> Project {
+        let mut project = self.clone();
+
+        project.git = String::new();
+        project.networks = Vec::new();
+        project.volumes = Vec::new();
+        project.on_install = Vec::new();
+        project.on_up = Vec::new();
+        project.after_up = Vec::new();
+        project.compose_files = Vec::new();
+
+        project
+    }
 }

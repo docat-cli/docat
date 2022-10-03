@@ -243,6 +243,17 @@ pub fn status(parameters: &Parameters) {
         });
 }
 
+pub fn exec(service: &String, command: &Vec<String>, project: &Project) {
+    docker::compose(
+        ComposeCmd::Exec(
+            service.clone(),
+            project.compose_files.clone(),
+            command.clone(),
+        ),
+        &project.dir,
+    );
+}
+
 fn statuses(parameters: &Parameters) -> BTreeMap<ProjectDirName, Vec<Service>> {
     parameters
         .projects

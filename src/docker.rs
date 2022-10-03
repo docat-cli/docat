@@ -15,6 +15,7 @@ pub enum ComposeCmd {
     Config(Vec<String>),
     List(Vec<String>),
     Down,
+    Exec(String, Vec<String>, Vec<String>),
 }
 
 pub fn network(subcommand: NetworkCmd) -> Output {
@@ -63,6 +64,10 @@ pub fn compose(subcommand: ComposeCmd, dir: &PathBuf) -> Output {
             cmd_wrapper.ignore_output = true;
             add_files(cmd, files);
             cmd.args(["ps", "--format", "json"])
+        }
+        ComposeCmd::Exec(service, files, command_string) => {
+            add_files(cmd, files);
+            cmd.args(["exec", "-T"]).arg(service).args(command_string)
         }
     };
 

@@ -71,6 +71,16 @@ enum Command {
         /// List of projects to get status for
         projects: Vec<String>,
     },
+    /// Run a command on a container
+    Exec {
+        /// Specify which project to execute command on
+        #[clap(global = true, long, short)]
+        project: Option<String>,
+        /// The service to run the command on
+        service: String,
+        /// The command to run on the service
+        command: Vec<String>,
+    },
 }
 
 #[derive(Clone)]
@@ -108,6 +118,13 @@ fn main() -> Result<()> {
                 args.all = Some(true);
             }
             docat::status(&get_parameters(&args, &projects, false)?)
+        }
+        Command::Exec {
+            service,
+            command,
+            project,
+        } => {
+            docat::exec(&service, &command, &get_project(&args, project)?);
         }
     };
 
@@ -196,4 +213,27 @@ fn filter_projects(
     }
 
     Ok(projects)
+}
+
+fn get_project(args: &Args, project_name: Option<String>) -> Result<Project> {
+    let app = get_app(args)?;
+    let dir = cwd();
+
+    app.projects
+        .iter()
+        .find(|(_, project)| project.dir == dir)
+        .map(|tuple| tuple.1.clone())
+        .or_else(|| {
+            app.projects
+                .iter()
+                .find(|(_, project)| {
+                    project_name.is_some()
+                        && (project.name == project_name
+                            || project_name == Some(project.dir_name.clone()))
+                })
+                .map(|tuple| tuple.1.clone())
+        })
+        .ok_or(anyhow::anyhow!(
+            "Could not determine project, consider passing the --project flag"
+        ))
 }
