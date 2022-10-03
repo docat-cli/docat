@@ -238,16 +238,15 @@ fn get_project(args: &Args, project_name: Option<String>) -> Result<Project> {
 
     app.projects
         .iter()
-        .find(|(_, project)| project.dir == dir)
+        .find(|(_, project)| {
+            project_name.is_some()
+                && (project.name == project_name || project_name == Some(project.dir_name.clone()))
+        })
         .map(|tuple| tuple.1.clone())
         .or_else(|| {
             app.projects
                 .iter()
-                .find(|(_, project)| {
-                    project_name.is_some()
-                        && (project.name == project_name
-                            || project_name == Some(project.dir_name.clone()))
-                })
+                .find(|(_, project)| project.dir == dir)
                 .map(|tuple| tuple.1.clone())
         })
         .ok_or(anyhow::anyhow!(
